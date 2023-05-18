@@ -1,22 +1,24 @@
 import { FastifyInstance } from 'fastify'
-import { z } from 'zod'
 import axios from 'axios'
+import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
-export function authRoutes(app: FastifyInstance) {
+export async function authRoutes(app: FastifyInstance) {
   app.post('/register', async (request) => {
     const bodySchema = z.object({
       code: z.string(),
     })
+
     const { code } = bodySchema.parse(request.body)
+
     const accessTokenResponse = await axios.post(
       'https://github.com/login/oauth/access_token',
       null,
       {
         params: {
-          code,
           client_id: process.env.GITHUB_CLIENT_ID,
           client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code,
         },
         headers: {
           Accept: 'application/json',
@@ -31,6 +33,7 @@ export function authRoutes(app: FastifyInstance) {
         Authorization: `Bearer ${access_token}`,
       },
     })
+
     const userSchema = z.object({
       id: z.number(),
       login: z.string(),
@@ -45,16 +48,18 @@ export function authRoutes(app: FastifyInstance) {
         githubId: userInfo.id,
       },
     })
+
     if (!user) {
       user = await prisma.user.create({
         data: {
           githubId: userInfo.id,
-          name: userInfo.name,
           login: userInfo.login,
+          name: userInfo.name,
           avatarUrl: userInfo.avatar_url,
         },
       })
     }
+
     const token = app.jwt.sign(
       {
         name: user.name,
